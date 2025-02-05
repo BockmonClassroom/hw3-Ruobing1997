@@ -136,8 +136,58 @@ cleaned_group_stats = pd.DataFrame({
 
 t_stat_cleaned, p_value_cleaned = ttest_ind(control_group_cleaned, treatment_group_cleaned, equal_var=False)
 
-print("Cleaned Group Stats::")
+print("Cleaned Group Stats:")
 print(cleaned_group_stats)
 
 print("\nCleaned T-test Results:")
 print(f"T-statistic: {t_stat_cleaned}, P-value: {p_value_cleaned}")
+
+# Part 5
+df_t3 = pd.read_csv("./Data/t3_user_active_min_pre.csv")
+print(f"t3 min: {df_t3['active_mins'].min()}, t3 max: {df_t3['active_mins'].max()}")
+
+df_t3_cleaned = df_t3[df_t3["active_mins"] <= 1440]
+
+df_t3_aggregated = df_t3_cleaned.groupby("uid")["active_mins"].sum().reset_index()
+df_t3_aggregated.rename(columns={"active_mins": "total_active_mins_pre"}, inplace=True)
+
+df_combined = df_aggregated_cleaned.merge(df_t3_aggregated, on="uid", how="inner")
+df_combined["delta_active_mins"] = df_combined["total_active_mins"] - df_combined["total_active_mins_pre"]
+print(df_combined["delta_active_mins"].isnull().sum())
+print(df_combined["delta_active_mins"].describe())
+
+df_combined.to_csv('./EDA/t1_t2_t3_aggregated_cleaned.csv', index=False)
+
+control_delta = df_combined[df_combined["variant_number"] == 0]["delta_active_mins"]
+treatment_delta = df_combined[df_combined["variant_number"] == 1]["delta_active_mins"]
+
+delta_stats = pd.DataFrame({
+    "Group": ["Control", "Treatment"],
+    "Mean Delta": [control_delta.mean(), treatment_delta.mean()],
+    "Median Delta": [control_delta.median(), treatment_delta.median()],
+    "Standard Deviation": [control_delta.std(), treatment_delta.std()],
+    "Count": [len(control_delta), len(treatment_delta)]
+})
+
+t_stat_delta, p_value_delta = ttest_ind(control_delta, treatment_delta, equal_var=False)
+
+print("Delta Stats:")
+print(delta_stats)
+
+print("\nDelta T-test Results:")
+print(f"T-statistic: {t_stat_delta}, P-value: {p_value_delta}")
+
+# Part 6.
+df_t4 = pd.read_csv("./Data/t4_user_attributes.csv")
+df_merged_t4 = df_combined.merge(df_t4, on="uid", how="inner")
+
+interaction_stats = df_merged_t4.groupby(['user_type', 'gender'])['delta_active_mins'].mean().unstack()
+print("\n Interaction_stats")
+print(interaction_stats)
+
+plt.figure(figsize=(10, 6))
+sns.heatmap(interaction_stats, annot=True, fmt=".2f", cmap="coolwarm", cbar_kws={'label': 'Mean Delta Active Minutes'})
+plt.title("Interaction Between User Type and Gender on Delta Active Minutes")
+plt.xlabel("Gender")
+plt.ylabel("User Type")
+plt.savefig('./images/part6_segement_analysis.png')
